@@ -1,0 +1,16 @@
+training_file: sample_cosmodc2_w10year_errors.hdf5
+output_file: flexcode_model_ymltest.pkl
+sharpen_bumpthresh_outputfile: tmp_cdetest_vals.out
+max_basis_functions: 35
+basis_system: cosine
+z_min: 0.0
+z_max: 3.0
+regression_params: {'max_depth': 8}
+bump_thresh_grid_min: 0.02
+bump_thresh_grid_max: 0.351
+bump_thresh_grid_delta: 0.02
+training_fraction: 0.8
+sharpen_min: 0.8
+sharpen_max: 2.101
+sharpen_delta: 0.1
+
