@@ -37,8 +37,8 @@ class FlexZPipe(PipelineStage):
         #"point_estimate": "mode",  # mean, mode, or median          
         "has_redshift": True, #does the test file have redshift?
         #if so, read in and append to output file.
-        "nz": 300, #Number of grid points that FZboost will calculate
-        "model_picklefile": "/global/projecta/projectdirs/lsst/groups/PZ/FlexZBoost/FlexZPipe/testflexcode_model.pkl", #the pickle file containing the trained  flexzbooxt model.
+        "nz": 300, #Number of grid points that FZboost will calculate   
+        "model_picklefile": "/global/homes/c/chihway/FlexZPipe/flexcode_model_sqderr.pkl", #the pickle file containing the trained  flexzbooxt model.
         "metacal_fluxes": False, #switch for whether or not to run metacal suffices
     }
 
@@ -57,13 +57,13 @@ class FlexZPipe(PipelineStage):
             suffices = ["", "_1p", "_1m", "_2p", "_2m"]
         self.suffices = suffices
         bands = self.config['bands']
-        cols =  [f'mag_{band}_lsst{suffix}' for band in bands for suffix in suffices]
+        cols =  [f'{band}_mag{suffix}' for band in bands for suffix in suffices]
         # We only have one set of errors, though                                           
-        cols += [f'mag_err_{band}_lsst' for band in bands]
+        cols += [f'{band}_mag_err' for band in bands]
         cols += ["id"]
         has_sz = self.config['has_redshift']
         if has_sz:
-            cols += ["redshift"]
+            cols += ["redshift_true"]
 
         #read in the pre-trained FlexZBoost model
         model_file = self.config['model_picklefile']
@@ -130,7 +130,7 @@ class FlexZPipe(PipelineStage):
         nobj = ids.size
         nz = len(z_grid)
         if has_sz == True:
-            szs = np.array(cat['photometry/redshift'])
+            szs = np.array(cat['photometry/redshift_true'])
         cat.close()
 
         
@@ -183,18 +183,18 @@ class FlexZPipe(PipelineStage):
         #specific columns when estimating pdfs
         
         for ii,suffix in enumerate(self.suffices):
-            i_mag = data[f'mag_i_lsst{suffix}']
+            i_mag = data[f'i_mag{suffix}']
             if ii==0:
                 tmpdict = {f'i_mag{suffix}':i_mag}
                 df = pd.DataFrame(tmpdict)
             for xx in range(numfilts-1):
                 df[f'color_{bands[xx]}{bands[xx+1]}{suffix}']= \
-	        np.array(data[f'mag_{bands[xx]}_lsst{suffix}']) -\
-                np.array(data[f'mag_{bands[xx+1]}_lsst{suffix}'])
+	        np.array(data[f'{bands[xx]}_mag{suffix}']) -\
+                np.array(data[f'{bands[xx+1]}_mag{suffix}'])
 
                 df[f'color_err_{bands[xx]}{bands[xx+1]}{suffix}'] = np.sqrt(\
-                np.array(data[f'mag_err_{bands[xx]}_lsst{suffix}'])**2.0 +\
-                np.array(data[f'mag_err_{bands[xx+1]}_lsst{suffix}'])**2.0)
+                np.array(data[f'{bands[xx]}_mag_err{suffix}'])**2.0 +\
+                np.array(data[f'{bands[xx]}_mag_err{suffix}'])**2.0)
 
         #new_data = df.to_numpy()
         #return new_data
