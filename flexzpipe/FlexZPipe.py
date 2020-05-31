@@ -25,26 +25,25 @@ class FlexZPipe(PipelineStage):
 #        ('photoz_pdfs', PhotozPDFFile),                                                   
         ('photoz_pdfs', HDFFile),]
     config_options = {
-        #"dz":   0.01,
-        #"zmin": 0.005,
-	#"zmax": 3.505,
         "chunk_rows": 1000,
         "bands": ["u","g","r","i","z","y"],
         "sigma_intrins": 0.05, #"intrinsic" assumed scatter, used in ODDS                  
         "odds_int": 0.99445, #number of sigma_intrins to integrate +/- around peak         
         # note that 1.95993 is the number of sigma you get for old "ODDS" =0.95            
-        #in old BPZ, 0.68 is 0.99445                                                       
-        #"point_estimate": "mode",  # mean, mode, or median          
+        #in old BPZ, 0.68 is 0.99445                                                           
         "has_redshift": True, #does the test file have redshift?
         #if so, read in and append to output file.
         "nz": 300, #Number of grid points that FZboost will calculate   
-        "model_picklefile": "/global/homes/c/chihway/FlexZPipe/flexcode_model_sqderr.pkl", #the pickle file containing the trained  flexzbooxt model.
+        "model_picklefile": "data/example/inputs/flexcode_model_sqderr.pkl", 
+        #the pickle file containing the trained  flexzbooxt model.
         "metacal_fluxes": False, #switch for whether or not to run metacal suffices
     }
 
     def run(self):
 
         starttime = time.time()
+
+        # not sure what the two lines below are for...
         os.environ["HDF5_USE_FILE_LOCKING"]="FALSE"
         os.environ["CECI_SETUP"]="/global/projecta/projectdirs/lsst/groups/PZ/FlexZBoost/FlexZPipe/setup-flexz-cori-update"
 
@@ -196,8 +195,6 @@ class FlexZPipe(PipelineStage):
                 np.array(data[f'{bands[xx]}_mag_err{suffix}'])**2.0 +\
                 np.array(data[f'{bands[xx]}_mag_err{suffix}'])**2.0)
 
-        #new_data = df.to_numpy()
-        #return new_data
         return df
         
     def estimate_pdfs(self, fz_model, new_data, nz):
@@ -239,7 +236,7 @@ class FlexZPipe(PipelineStage):
 
             for i in range(ngal):
                 pdf = np.array(pdfs[i,:])
-                #print(f'pdf shape: {pdf.shape}')
+
                 # calculate mean redshift
                 point_estimates[6*s+0, i] = (pdf * zgrid).sum()/pdf.sum()
                 # calculate z_mode                                                  
@@ -286,8 +283,7 @@ class FlexZPipe(PipelineStage):
     def pdf_median(self, z, p):
         psum = p.sum()
         cdf = np.cumsum(p)
-        if np.isclose(psum,0.0):
-            #print("problem with p(z), forcing to 0.0")                                        
+        if np.isclose(psum,0.0):                            
             return 0.0
         else:
             cdf = np.concatenate([[0.0], cdf])
