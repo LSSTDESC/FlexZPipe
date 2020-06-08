@@ -1,5 +1,8 @@
 from ceci import PipelineStage
-from descformats import TextFile, HDFFile, YamlFile
+try:
+    from txpipe.data_types import TextFile, HDFFile, YamlFile
+except ImportError:
+    from descformats import TextFile, HDFFile, YamlFile
 #from txpipe.data_types import PhotozPDFFile                                               
 import os
 import sys
