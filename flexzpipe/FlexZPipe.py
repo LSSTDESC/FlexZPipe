@@ -13,7 +13,7 @@ import time
 import flexcode
 from flexcode.helpers import make_grid #need to make proper z_grid
 
-# This class runs the python3 version of BPZ from the command line                         
+# This class runs the python3 version of FlexZPipe from the command line
 class FlexZPipe(PipelineStage):
     """Pipeline stage to run a trained model of FlexZBoost in python
        The code will be set up to read and write hdf5 files in the
@@ -37,7 +37,7 @@ class FlexZPipe(PipelineStage):
         "has_redshift": True, #does the test file have redshift?
         #if so, read in and append to output file.
         "nz": 300, #Number of grid points that FZboost will calculate   
-        "model_picklefile": "data/example/inputs/flexcode_model_sqderr.pkl", 
+        "model_picklefile": "flexcode_model.pkl", 
         #the pickle file containing the trained  flexzbooxt model.
         "metacal_fluxes": False, #switch for whether or not to run metacal suffices
     }
@@ -46,9 +46,10 @@ class FlexZPipe(PipelineStage):
 
         starttime = time.time()
 
-        # not sure what the two lines below are for...
+        # This should usually be set in the environment, but in case not,
+        # do so here.  It allows us to use parallel HDF5 access on NERSC
+        # Lustre file systems.
         os.environ["HDF5_USE_FILE_LOCKING"]="FALSE"
-        os.environ["CECI_SETUP"]="/global/projecta/projectdirs/lsst/groups/PZ/FlexZBoost/FlexZPipe/setup-flexz-cori-update"
 
         # Columns we will need from the data                                               
         # Note that we need all the metacalibrated variants too.                           
@@ -92,7 +93,7 @@ class FlexZPipe(PipelineStage):
 
             # Calculate the pseudo-fluxes that we need                                     
             new_data = self.preprocess_data(data)
-            # Actually run BPZ                                                             
+            # Actually run FlexZBoost                                                             
             point_estimates, pdfs = self.estimate_pdfs(fz_model, new_data,nz)
 
             # Save this chunk of data                                                      
