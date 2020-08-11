@@ -10,7 +10,7 @@ import time
 import flexcode
 from flexcode.helpers import make_grid #need to make proper z_grid
 
-# This class runs the python3 version of BPZ from the command line                         
+# This class runs the python3 version of FlexZPipe from the command line
 class FlexZPipe(PipelineStage):
     """Pipeline stage to run a trained model of FlexZBoost in python
        The code will be set up to read and write hdf5 files in the
@@ -25,28 +25,28 @@ class FlexZPipe(PipelineStage):
 #        ('photoz_pdfs', PhotozPDFFile),                                                   
         ('photoz_pdfs', HDFFile),]
     config_options = {
-        #"dz":   0.01,
-        #"zmin": 0.005,
-	#"zmax": 3.505,
         "chunk_rows": 1000,
         "bands": ["u","g","r","i","z","y"],
         "sigma_intrins": 0.05, #"intrinsic" assumed scatter, used in ODDS                  
         "odds_int": 0.99445, #number of sigma_intrins to integrate +/- around peak         
         # note that 1.95993 is the number of sigma you get for old "ODDS" =0.95            
-        #in old BPZ, 0.68 is 0.99445                                                       
-        #"point_estimate": "mode",  # mean, mode, or median          
+        #in old BPZ, 0.68 is 0.99445                                                           
         "has_redshift": True, #does the test file have redshift?
         #if so, read in and append to output file.
-        "nz": 300, #Number of grid points that FZboost will calculate
-        "model_picklefile": "/global/projecta/projectdirs/lsst/groups/PZ/FlexZBoost/FlexZPipe/testflexcode_model.pkl", #the pickle file containing the trained  flexzbooxt model.
+        "nz": 300, #Number of grid points that FZboost will calculate   
+        "model_picklefile": "flexcode_model.pkl", 
+        #the pickle file containing the trained  flexzbooxt model.
         "metacal_fluxes": False, #switch for whether or not to run metacal suffices
     }
 
     def run(self):
 
         starttime = time.time()
+
+        # This should usually be set in the environment, but in case not,
+        # do so here.  It allows us to use parallel HDF5 access on NERSC
+        # Lustre file systems.
         os.environ["HDF5_USE_FILE_LOCKING"]="FALSE"
-        os.environ["CECI_SETUP"]="/global/projecta/projectdirs/lsst/groups/PZ/FlexZBoost/FlexZPipe/setup-flexz-cori-update"
 
         # Columns we will need from the data                                               
         # Note that we need all the metacalibrated variants too.                           
@@ -57,13 +57,13 @@ class FlexZPipe(PipelineStage):
             suffices = ["", "_1p", "_1m", "_2p", "_2m"]
         self.suffices = suffices
         bands = self.config['bands']
-        cols =  [f'mag_{band}_lsst{suffix}' for band in bands for suffix in suffices]
+        cols =  [f'{band}_mag{suffix}' for band in bands for suffix in suffices]
         # We only have one set of errors, though                                           
-        cols += [f'mag_err_{band}_lsst' for band in bands]
+        cols += [f'{band}_mag_err' for band in bands]
         cols += ["id"]
         has_sz = self.config['has_redshift']
         if has_sz:
-            cols += ["redshift"]
+            cols += ["redshift_true"]
 
         #read in the pre-trained FlexZBoost model
         model_file = self.config['model_picklefile']
@@ -90,7 +90,7 @@ class FlexZPipe(PipelineStage):
 
             # Calculate the pseudo-fluxes that we need                                     
             new_data = self.preprocess_data(data)
-            # Actually run BPZ                                                             
+            # Actually run FlexZBoost                                                             
             point_estimates, pdfs = self.estimate_pdfs(fz_model, new_data,nz)
 
             # Save this chunk of data                                                      
@@ -130,7 +130,7 @@ class FlexZPipe(PipelineStage):
         nobj = ids.size
         nz = len(z_grid)
         if has_sz == True:
-            szs = np.array(cat['photometry/redshift'])
+            szs = np.array(cat['photometry/redshift_true'])
         cat.close()
 
         
@@ -183,21 +183,19 @@ class FlexZPipe(PipelineStage):
         #specific columns when estimating pdfs
         
         for ii,suffix in enumerate(self.suffices):
-            i_mag = data[f'mag_i_lsst{suffix}']
+            i_mag = data[f'i_mag{suffix}']
             if ii==0:
                 tmpdict = {f'i_mag{suffix}':i_mag}
                 df = pd.DataFrame(tmpdict)
             for xx in range(numfilts-1):
                 df[f'color_{bands[xx]}{bands[xx+1]}{suffix}']= \
-	        np.array(data[f'mag_{bands[xx]}_lsst{suffix}']) -\
-                np.array(data[f'mag_{bands[xx+1]}_lsst{suffix}'])
+	        np.array(data[f'{bands[xx]}_mag{suffix}']) -\
+                np.array(data[f'{bands[xx+1]}_mag{suffix}'])
 
                 df[f'color_err_{bands[xx]}{bands[xx+1]}{suffix}'] = np.sqrt(\
-                np.array(data[f'mag_err_{bands[xx]}_lsst{suffix}'])**2.0 +\
-                np.array(data[f'mag_err_{bands[xx+1]}_lsst{suffix}'])**2.0)
+                np.array(data[f'{bands[xx]}_mag_err{suffix}'])**2.0 +\
+                np.array(data[f'{bands[xx]}_mag_err{suffix}'])**2.0)
 
-        #new_data = df.to_numpy()
-        #return new_data
         return df
         
     def estimate_pdfs(self, fz_model, new_data, nz):
@@ -239,7 +237,7 @@ class FlexZPipe(PipelineStage):
 
             for i in range(ngal):
                 pdf = np.array(pdfs[i,:])
-                #print(f'pdf shape: {pdf.shape}')
+
                 # calculate mean redshift
                 point_estimates[6*s+0, i] = (pdf * zgrid).sum()/pdf.sum()
                 # calculate z_mode                                                  
@@ -286,8 +284,7 @@ class FlexZPipe(PipelineStage):
     def pdf_median(self, z, p):
         psum = p.sum()
         cdf = np.cumsum(p)
-        if np.isclose(psum,0.0):
-            #print("problem with p(z), forcing to 0.0")                                        
+        if np.isclose(psum,0.0):                            
             return 0.0
         else:
             cdf = np.concatenate([[0.0], cdf])
